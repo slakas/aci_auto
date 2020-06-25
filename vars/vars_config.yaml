@@ -3,8 +3,5 @@
     vlanPoolName:             "POD1_SK"
 
   phys_dom:
-<<<<<<< HEAD
-      physDomName:            "POD1_SK_PHY"
-=======
+
       physDomName:            POD1_SK_PHY
->>>>>>> a8e8014d596d1e46c847d88e372378bd790271ea

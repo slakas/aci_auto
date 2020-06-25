@@ -1,0 +1,82 @@
+---
+#kaszlikowski.s@gmail.com
+#
+
+- name:               Dodanie VLAN POOL /
+  hosts:              apics
+  connection:         local
+  gather_facts:       no
+
+  vars_prompt:
+
+  - name: "apic_username"
+    prompt: "Wprowadz uzytkownika"
+    private: no
+  - name: "apic_userpass"
+    prompt: "Wprowadz haslo"
+    private: yes
+
+  vars_files:
+  - "vars/vars_config.yaml"
+  vars:
+    apic_info:        &apic_info
+      hostname: '{{ hostvars[inventory_hostname].apic_ip }}'
+      username: '{{ apic_username }}'
+      password: '{{ apic_userpass }}'
+      validate_certs: no
+      use_proxy: no
+
+    shared_vars:
+      descr:                    "Created by Ansible - skaszlikowski"
+
+  tasks:
+  # Create a snapshot
+  # DOCS: https://docs.ansible.com/ansible/2.7/modules/aci_config_snapshot_module.html#aci-config-snapshot-module
+  - name: Create snapshot
+    aci_config_snapshot:
+      <<: *apic_info
+      state: present
+      export_policy: config_backup
+      max_count: 10
+      description: snapshot (ansible)
+    delegate_to: localhost
+
+  # Create Vlan pool
+  - name: Add a new {{vlan_pools.vlanPoolName}} VLAN pool
+    aci_vlan_pool:
+      <<: *apic_info
+      pool: {{vlan_pools.vlanPoolName}}
+      pool_allocation_mode: static
+      description: POD1 SK VLANs
+      state: present
+    delegate_to: localhost
+
+  # Add vlan block to vlan pool
+  - name: Add a new 1100 - 11009 VLAN encap block to {{vlan_pools.vlanPoolName}} VLAN pool
+    aci_vlan_pool_encap_block:
+      <<: *apic_info
+      pool: {{vlan_pools.vlanPoolName}}
+      allocation_mode: static
+      block_start: 1100
+      block_end: 1109
+      state: present
+    delegate_to: localhost
+
+  # Add vlan block to vlan pool
+  - name: Add a new 1110 - 1119 VLAN encap block to {{vlan_pools.vlanPoolName}} VLAN pool
+    aci_vlan_pool_encap_block:
+      <<: *apic_info
+      pool: {{vlan_pools.vlanPoolName}}
+      allocation_mode: inherit
+      block_start: 1110
+      block_end: 1119
+      state: present
+    delegate_to: localhost
+
+  # Add a new physical domain
+  - name: Add a new {{phys_dom.physDomName}} physical domain
+    aci_domain:
+      <<: *apic_info
+      domain: {{phys_dom.physDomName}}
+      domain_type: phys
+      state: present

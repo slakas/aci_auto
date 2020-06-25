@@ -1,0 +1,8 @@
+---
+all:
+  children:
+    apics:
+      hosts:
+        apic_PROD_10.16.3.30:
+          ansible_host: 10.16.3.30
+          apic_ip: 10.16.3.30

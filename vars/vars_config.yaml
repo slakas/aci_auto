@@ -3,4 +3,4 @@
     vlanPoolName:             "POD1_SK"
 
   phys_dom:
-      physDomName:            POD1_SK_PHY
+      physDomName:            "POD1_SK_PHY"

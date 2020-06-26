@@ -20,18 +20,28 @@
   vars:
     apic_info:        &apic_info
       hostname: '{{ hostvars[inventory_hostname].apic_ip }}'
-      # username: '{{ apic_username }}'
-      # password: '{{ apic_userpass }}'
-      username: 'pod1'
-      password: 'Admin1sisko$'
+      username: '{{ apic_username }}'
+      password: '{{ apic_userpass }}'
       validate_certs: no
       use_proxy: no
 
+
+    tenant:
+      tenant_name: POD1_T1
+      vrfName: POD1_V1
+      bdName: POD1_BD1
+
+    app_profile:
+      apName: POD1_APP1
+      description: 'Aplikacja mieszajaca ludziom w glowie'
+      epg:
+        epgName: POD1_SRV21
+
     vlan_pools:
-      vlanPoolName: POD1_SK
+      vlanPoolName: POD1_Pool
 
     phys_dom:
-        physDomName: POD1_SK_PHY
+        physDomName: POD1_Phy
 
     aep: POD1_SK-AEP
 
@@ -184,5 +194,82 @@
       cdp_policy: POD1_CDP_ON
       port_channel_policy: POD1_SK_PortChannel_no_suspend
       aep: '{{ aep }}'
+      state: present
+    delegate_to: localhost
+
+  # Add Bridge Domain
+  # DOCS: https://docs.ansible.com/ansible/devel/modules/aci_bd_module.html#parameters
+  - name: Add Bridge Domain {{tenant.bdName}}
+    aci_bd:
+      <<: *apic_info
+      tenant: "{{ tenant.tenant_name }}"
+      bd: "{{ tenant.bdName }}"
+      vrf: "{{ tenant.vrfName }}"
+      state: present
+      arp_flooding: yes
+      l2_unknown_unicast: flood
+      enable_routing: yes
+
+  # Create a subnet
+  # https://docs.ansible.com/ansible/latest/modules/aci_bd_subnet_module.html#aci-bd-subnet-module
+  - name: Create a subnet
+    aci_bd_subnet:
+      <<: *apic_info
+      tenant: "{{ tenant.tenant_name }}"
+      bd: "{{ tenant.bdName }}"
+      gateway: 10.11.200.1
+      mask: 24
+      state: present
+    delegate_to: localhost
+
+  # Create a New App Profile
+  # DOCS: https://docs.ansible.com/ansible/devel/modules/aci_ap_module.html#parameters
+  - name: Create a New App Profile {{app_profile.apName}}
+    aci_ap:
+      <<: *apic_info
+      validate_certs: no
+      tenant: "{{tenant.tenant_name}}"
+      ap: "{{app_profile.apName}}"
+      state: present
+      description: "{{app_profile.description}}"
+      # name_alias: "{{app_profile.name_alias}}"
+
+  # Create a New EPG
+  # DOCS: https://docs.ansible.com/ansible/devel/modules/aci_epg_module.html#parameters
+  - name: Create a New EPG {{app_profile.epg.epgName}}
+    aci_epg:
+      <<: *apic_info
+      tenant: "{{tenant.tenant_name}}"
+      ap: "{{app_profile.apName}}"
+      epg: "{{app_profile.epg.epgName}}"
+      bd: "{{tenant.bdName}}"
+      state: present
+
+  # Add a physical domain to the EPG
+  # DOCS: https://docs.ansible.com/ansible/devel/modules/aci_epg_to_domain_module.html#parameters
+  - name: Add a physical domain to EPG {{app_profile.epg.epgName}}
+    aci_epg_to_domain:
+      <<: *apic_info
+      tenant: "{{tenant.tenant_name}}"
+      ap: "{{app_profile.apName}}"
+      epg: "{{app_profile.epg.epgName}}"
+      domain: "{{phys_dom.physDomName}}"
+      domain_type: phys
+      state: present
+
+  # Add static path to EPG
+  - name: Deploy Static Path binding for given EPG {{app_profile.epg.epgName}}
+    aci_static_binding_to_epg:
+      <<: *apic_info
+      tenant: "{{tenant.tenant_name}}"
+      ap: "{{app_profile.apName}}"
+      epg: "{{app_profile.epg.epgName}}"
+      encap_id: 1101
+      deploy_immediacy: immediate
+      interface_mode: untagged
+      interface_type: switch_port
+      pod_id: 1
+      leafs: 101
+      interface: '1/1'
       state: present
     delegate_to: localhost
